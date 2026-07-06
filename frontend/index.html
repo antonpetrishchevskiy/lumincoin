@@ -1,38 +1,18 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Index</title>
-    <link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="src/styles/layout.css">
-    <link rel="stylesheet" href="node_modules/fontawesome-free/css/all.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/bootstrap.min.css">
+
+    <title id="page-title"></title>
 </head>
-<body class="d-flex">
+<body>
 
-<!--Ссылки на страницы-->
-<div class="d-flex flex-column gap-3 m-5">
-    <a href="src/templates/pages/auth/login.html">Login</a>
-    <a href="src/templates/pages/auth/sign-up.html">SignUp</a>
-    <a href="src/templates/main.html">Main</a>
-    <a href="src/templates/pages/expenses/main.html">ExpensesMain</a>
-    <a href="src/templates/pages/expenses/popup.html">ExpensesPopup</a>
-    <a href="src/templates/pages/expenses/create.html">ExpensesCreate</a>
-    <a href="src/templates/pages/expenses/edit.html">ExpensesEdit</a>
-    <a href="src/templates/pages/generals/main.html">GeneralMain</a>
-    <a href="src/templates/pages/generals/popup.html">GeneralPopup</a>
-    <a href="src/templates/pages/generals/create.html">GeneralCreate</a>
-    <a href="src/templates/pages/generals/edit.html">GeneralEdit</a>
-    <a href="src/templates/pages/incomes/main.html">IncomesMain</a>
-    <a href="src/templates/pages/incomes/popup.html">IncomesPopup</a>
-    <a href="src/templates/pages/incomes/create.html">IncomesCreate</a>
-    <a href="src/templates/pages/incomes/edit.html">IncomesEdit</a>
-</div>
+<div id="content" class="content d-flex w-100"></div>
 
-<script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
-<script type="module" src="app.js"></script>
 </body>
 </html>
