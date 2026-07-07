@@ -1,48 +1,38 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Login</title>
-    <link rel="stylesheet" href="../../../../node_modules/bootstrap/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="../../../styles/style.css">
-    <link rel="stylesheet" href="../../../../node_modules/fontawesome-free/css/all.min.css">
-</head>
-<body class="d-flex">
-
-<section class="form-signin w-100 m-auto p-3">
-    <form>
-        <img class="mb-4 d-block mx-auto" src="../../../static/images/logo.png" alt="" width="171" height="70">
-        <h1 class="h3 mb-3 text-center enter-title fs-1 fw-medium">Вход</h1>
-        <div class="d-flex">
-            <div class="wrap-icon d-flex align-items-center justify-content-center p-2">
-                <i class="far fa-envelope-open text-secondary"></i>
+<div class="auth-wrap d-flex align-items-center justify-content-center w-100">
+    <div class="form-signin w-100 m-auto p-3">
+        <form>
+            <img class="mb-4 d-block mx-auto" src="/static/images/logo.png" alt="" width="171" height="70">
+            <h1 class="h3 mb-3 text-center enter-title fs-1 fw-medium">Вход</h1>
+            <div class="mb-2 text-center text-danger" id="error-login"></div>
+            <div class="d-flex input-block">
+                <div class="wrap-icon d-flex align-items-center justify-content-center p-2">
+                    <i class="far fa-envelope-open text-secondary"></i>
+                </div>
+                <div class="form-floating w-100">
+                    <input type="email" class="form-control logOrSign pt-4" id="loginEmail"
+                           placeholder="Электронная почта">
+                    <label for="loginEmail" class="d-flex align-items-center text-secondary">Электронная почта</label>
+                </div>
             </div>
-            <div class="form-floating w-100">
-                <input type="email" class="form-control pt-4" id="loginInEmail" placeholder="Электронная почта">
-                <label for="loginInEmail" class="d-flex align-items-center text-secondary">Электронная почта</label>
+            <div class="error mb-2 text-danger">Заполните email</div>
+            <div class="d-flex mt-2 input-block">
+                <div class="wrap-icon d-flex align-items-center justify-content-center p-2">
+                    <i class="fas fa-lock text-secondary"></i>
+                </div>
+                <div class="form-floating w-100">
+                    <input type="password" class="form-control logOrSign pt-4" id="loginPassword" placeholder="Пароль">
+                    <label for="loginPassword" class="d-flex align-items-center text-secondary">Пароль</label>
+                </div>
             </div>
-        </div>
-        <div class="d-flex mt-2">
-            <div class="wrap-icon d-flex align-items-center justify-content-center p-2">
-                <i class="fas fa-lock text-secondary"></i>
+            <div class="error mb-2 text-danger">Заполните поле (не менее 6 символов)</div>
+            <div class="form-check text-start my-3">
+                <input class="form-check-input" type="checkbox" value="remember-me" id="remember-meInput">
+                <label class="form-check-label" for="remember-meInput">
+                    Запомнить меня
+                </label>
             </div>
-            <div class="form-floating w-100">
-                <input type="password" class="form-control pt-4" id="loginInPassword" placeholder="Пароль">
-                <label for="loginInPassword" class="d-flex align-items-center text-secondary">Пароль</label>
-            </div>
-        </div>
-        <div class="form-check text-start my-3">
-            <input class="form-check-input" type="checkbox" value="remember-me" id="flexCheckDefault">
-            <label class="form-check-label" for="flexCheckDefault">Запомнить меня</label>
-        </div>
-        <button class="btn btn-primary w-100 mb-1 mt-3" type="submit">Войти</button>
-        <p class="mt-1 mb-3 text-body-secondary">Еще нет аккаунта? <a href="sign-up.html">Пройти регистрацию</a></p>
-    </form>
-</section>
-
-<script src="../../../../node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+            <button id="loginBtn" class="btn btn-primary w-100 mb-1 mt-3" type="button">Войти</button>
+            <p class="mt-1 mb-3 text-body-secondary">Еще нет аккаунта? <a href="/sign-up">Пройти регистрацию</a></p>
+        </form>
+    </div>
+</div>
