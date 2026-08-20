@@ -13,6 +13,35 @@ export class AuthTokens {
         return localStorage.getItem(tokenName);
     }
 
+    static removeToken() {
+        localStorage.clear();
+    }
+
+    static async processUnauthorisedResponse() {
+        const refreshToken =localStorage.getItem(this.refreshTokenKey);
+        if (refreshToken) {
+            const  response = await fetch(config.host + '/refresh',  {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({refreshTaken: refreshToken})
+            });
+            if (response &&  response.status === 200) {
+                const result = await response.json();
+                if (result && !result.error) {
+                    this.setToken(result.accessToken, result.refreshToken);
+                    return true;
+                }
+            }
+        }
+        this.removeToken();
+        location.href = '=/login';
+        return false;
+
+    }
+
     static async getTokensAfterRegistration(email, password, rememberMe = false) {
         const response = await fetch(config.api + '/login', {
             method: 'POST',
