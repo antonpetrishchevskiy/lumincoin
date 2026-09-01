@@ -14,58 +14,59 @@ export class AuthTokens {
     }
 
     static removeToken() {
-        localStorage.clear();
+        localStorage.removeItem(this.accessTokenKey);
+        localStorage.removeItem(this.refreshTokenKey);
+        localStorage.removeItem(this.userInfoTokenKey);
+    }
+
+    static async parseResponse(response) {
+        const contentType = response.headers.get('content-type') || '';
+
+        if (!contentType.includes('application/json')) {
+            return {};
+        }
+
+        return response.json();
     }
 
     static async processUnauthorisedResponse() {
-        const refreshToken =localStorage.getItem(this.refreshTokenKey);
-        if (refreshToken) {
-            const  response = await fetch(config.host + '/refresh',  {
+        const refreshToken = this.getToken(this.refreshTokenKey);
+
+        if (!refreshToken) {
+            this.removeToken();
+            location.href = '/login';
+            return false;
+        }
+
+        try {
+            const response = await fetch(config.api + '/refresh', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({refreshTaken: refreshToken})
+                body: JSON.stringify({refreshToken})
             });
-            if (response &&  response.status === 200) {
-                const result = await response.json();
-                if (result && !result.error) {
-                    this.setToken(result.accessToken, result.refreshToken);
-                    return true;
-                }
+
+            const result = await this.parseResponse(response);
+            const tokens = result.tokens;
+
+            if (!response.ok || result.error || !tokens?.accessToken || !tokens?.refreshToken) {
+                throw new Error(result.message || 'Не удалось обновить токен');
             }
+
+            this.setToken(this.accessTokenKey, tokens.accessToken);
+            this.setToken(this.refreshTokenKey, tokens.refreshToken);
+
+            if (result.user) {
+                this.setToken(this.userInfoTokenKey, JSON.stringify(result.user));
+            }
+
+            return true;
+        } catch (error) {
+            this.removeToken();
+            location.href = '/login';
+            return false;
         }
-        this.removeToken();
-        location.href = '=/login';
-        return false;
-
-    }
-
-    static async getTokensAfterRegistration(email, password, rememberMe = false) {
-        const response = await fetch(config.api + '/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-                email: email,
-                password: password,
-                rememberMe: rememberMe,
-            })
-        })
-
-        const result = await response.json();
-
-        if (result.error || !result.tokens || !result.user) {
-            return result;
-        }
-
-        AuthTokens.setToken(AuthTokens.accessTokenKey, result.tokens.accessToken);
-        AuthTokens.setToken(AuthTokens.refreshTokenKey, result.tokens.refreshToken);
-        AuthTokens.setToken(AuthTokens.userInfoTokenKey, JSON.stringify(result.user));
-
-        return result;
     }
 }
