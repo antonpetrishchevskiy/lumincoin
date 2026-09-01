@@ -1,4 +1,4 @@
-import {AuthTokens} from "./auth-utils";
+import {AuthTokens} from "./auth-utils.js";
 
 export class CustomHttpUtils {
     static async request(url, method = 'GET', isLogged = true, body = null) {
@@ -6,32 +6,40 @@ export class CustomHttpUtils {
             method,
             headers: {
                 'Content-Type': 'application/json',
-                'accept': 'application/json',
+                'Accept': 'application/json',
             }
-        }
+        };
+
         if (isLogged) {
-            const token = localStorage.getItem('authToken');
-            if (token != null) {
+            const token = AuthTokens.getToken(AuthTokens.accessTokenKey);
+
+            if (token) {
                 params.headers['x-auth-token'] = token;
             }
         }
+
         if (body != null) {
             params.body = JSON.stringify(body);
         }
 
         const response = await fetch(url, params);
 
-        if (response.status < 200 && response.status >= 300) {
-            if (response.status === 401) {
-                const result = await AuthTokens.processUnauthorisedResponse();
-                if (result) {
-                    return await this.request(url, method, islogged, result);
-                } else {
-                    return null;
-                }
+        if (response.status === 401 && isLogged) {
+            const refreshed = await AuthTokens.processUnauthorisedResponse();
+
+            if (refreshed) {
+                return this.request(url, method, isLogged, body);
             }
-            throw new Error(response.message)
+
+            return null;
         }
-        return await response.json();
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || 'Request failed');
+        }
+
+        return result;
     }
 }
