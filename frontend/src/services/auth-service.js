@@ -1,6 +1,5 @@
 import {AuthTokens} from "../utils/auth-utils.js";
 import {config} from "../config/config.js";
-
 export class AuthService {
     static async parseResponse(response) {
         const contentType = response.headers.get('content-type') || '';
