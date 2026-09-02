@@ -52,6 +52,9 @@ export class Validation {
                         this.password = inputElement.value; // Сохраняем пароль для проверки повторного ввода
                     }
                 }
+                if (inputElement.type === 'password' && inputElement.id !== 'signUpInputRepeatPassword') {
+                    date.passwordInputElement = inputElement.value;
+                }
                 if (inputElement.id === 'signUpInputRepeatPassword') {
                     // Проверка совпадения паролей
                     if (inputElement.value !== this.password) {
