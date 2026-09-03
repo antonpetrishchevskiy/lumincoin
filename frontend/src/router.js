@@ -208,7 +208,10 @@ export class Router {
         const isAuthenticated = !!AuthTokens.getToken(AuthTokens.accessTokenKey);
         let newRoute = this.routes.find(route => route.route === urlRoute);
 
-        if (!isAuthenticated && newRoute?.useLayout) {
+        if (isAuthenticated && (urlRoute === '/login' || urlRoute === '/sign-up')) {
+            history.replaceState(null, '', '/');
+            newRoute = this.routes.find(route => route.route === '/');
+        } else if (!isAuthenticated && newRoute?.useLayout) {
             history.replaceState(null, '', '/sign-up');
             newRoute = this.routes.find(route => route.route === '/sign-up');
         }
