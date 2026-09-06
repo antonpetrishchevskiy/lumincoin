@@ -1,63 +1,64 @@
-import {AuthTokens} from "../../utils/auth-utils.js";
-import {Validation} from "../../utils/validation.js";
-import {FormUtils} from "../../utils/reset-validation.js";
+import {config} from "../../config/config.js";
+import {AuthTokens} from "../utils/auth-utils.js";
+import {Validation} from "../utils/validation.js";
+import {FormUtils} from "../utils/reset-validation.js";
 
 export class SignUp {
     password = '';
 
     constructor(openNewRouteAutomatic) {
         this.openNewRouteAutomatic = openNewRouteAutomatic;
-        this.inputsElement = document.querySelectorAll('.form-floating input');
+        this.inputsElement = document.querySelectorAll('.form-floating  input');
         this.errorSignUp = document.getElementById('error-singUp');
         document.getElementById("singUpBtn").addEventListener("click", this.signUp.bind(this));
-
-        document.getElementById("signUpInputPassword")?.addEventListener("input", (e) => {
-            this.password = e.target.value;
-        });
     }
 
     async signUp() {
         FormUtils.resetValidationErrors(this.inputsElement, this.errorSignUp);
 
+        // Проводим валидацию
         const validationResult = Validation.validForm(this.inputsElement, this.password);
 
         if (!validationResult) {
+            // Если валидация не прошла, показываем сообщение
             this.errorSignUp.innerText = 'Пожалуйста, заполните все поля корректно';
             return;
         }
 
-        const result = await AuthTokens.signUp({
-            name: validationResult.nameInputElement,
-            lastName: validationResult.lastNameInputElement,
-            email: validationResult.emailInputElement,
-            password: validationResult.passwordInputElement,
-            passwordRepeat: validationResult.passwordReplaceInputElement
-        });
+        // Если валидация прошла, пытаемся зарегистрироваться
+        if (Validation.validForm(this.inputsElement, this.password)) {
+            const date = Validation.validForm(this.inputsElement);
 
-        if (result.error || !result.user) {
-            const isExistingUser = result.message?.toLowerCase().includes('already exist');
+            const response = await fetch(config.api + '/signup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: date.nameInputElement,
+                    lastName: date.lastNameInputElement,
+                    email: date.emailInputElement,
+                    password: date.passwordInputElement,
+                    passwordRepeat: date.passwordReplaceInputElement
+                })
+            })
 
-            if (isExistingUser) {
-                AuthTokens.setUserEmail(validationResult.emailInputElement);
-                await this.openNewRouteAutomatic('/login');
+            const result = await response.json();
+
+            if (!result.user) {
+                this.errorSignUp.innerText = "Ошибка регистрации";
                 return;
+            } else {
+                this.errorSignUp.innerText = '';
             }
 
-            this.errorSignUp.innerText = result.message || 'Ошибка регистрации';
-            return;
+            await AuthTokens.getTokensAfterRegistration(result.user.email, date.passwordInputElement);
+
+            this.openNewRouteAutomatic('/');
+
+        } else {
+            alert('Ошибка регистрации. Попробуйте снова!');
         }
-
-        const resultToken = await AuthTokens.login(
-            result.user.email,
-            validationResult.passwordInputElement
-        );
-
-        if (resultToken.error || !resultToken.tokens || !resultToken.user) {
-            this.errorSignUp.innerText = resultToken.message || 'Регистрация выполнена, но войти не удалось';
-            return;
-        }
-
-        this.errorSignUp.innerText = '';
-        this.openNewRouteAutomatic('/');
     }
 }

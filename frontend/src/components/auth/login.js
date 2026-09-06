@@ -1,6 +1,7 @@
-import {Validation} from "../../utils/validation.js";
-import {AuthTokens} from "../../utils/auth-utils.js";
-import {FormUtils} from "../../utils/reset-validation.js";
+import {Validation} from "../utils/validation.js";
+import {AuthTokens} from "../utils/auth-utils.js";
+import {FormUtils} from "../utils/reset-validation.js";
+
 
 export class Login {
     constructor(openNewRouteAutomatic) {
@@ -8,39 +9,30 @@ export class Login {
         this.inputsElement = document.querySelectorAll('.form-floating  input');
         this.rememberMeInput = document.getElementById('remember-meInput');
         this.errorLogin = document.getElementById('error-login');
-
-        const savedEmail = AuthTokens.getToken(AuthTokens.userEmailKey);
-        const emailInput = document.getElementById('loginEmail');
-
-        if (savedEmail && emailInput) {
-            emailInput.value = savedEmail;
-        }
-
         document.getElementById("loginBtn").addEventListener("click", this.login.bind(this));
     }
 
     async login() {
+        // Очищаем значения и стили полей с помощью утилиты
         FormUtils.resetValidationErrors(this.inputsElement, this.errorLogin);
 
-        const validationResult = Validation.validForm(this.inputsElement);
+        if (Validation.validForm(this.inputsElement)) {
+            const date = Validation.validForm(this.inputsElement);
 
-        if (!validationResult) {
+            const result = await AuthTokens.getTokensAfterRegistration(date.emailInputElement, date.passwordInputElement, this.rememberMeInput.checked);
+            if (result) {
+                if (result.error || !result.tokens || !result.user) {
+                    this.errorLogin.innerText = 'Такого пользователя не существует';
+                    return;
+                } else {
+                    this.errorLogin.innerText = '';
+                }
+
+                this.openNewRouteAutomatic('/');
+                return
+
+            }
             this.errorLogin.innerText = 'Пожалуйста, заполните все поля корректно';
-            return;
         }
-
-        const result = await AuthTokens.login(
-            validationResult.emailInputElement,
-            validationResult.passwordInputElement,
-            this.rememberMeInput.checked
-        );
-
-        if (result.error || !result.tokens || !result.user) {
-            this.errorLogin.innerText = result.message || 'Ошибка авторизации';
-            return;
-        }
-
-        this.errorLogin.innerText = '';
-        this.openNewRouteAutomatic('/');
     }
 }
