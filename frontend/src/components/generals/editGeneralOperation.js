@@ -1,7 +1,8 @@
-import {AuthTokens} from "../utils/auth-utils.js";
 import {Response} from "../utils/response-utils.js";
-import {Validation} from "../utils/validation.js";
+import {AuthTokens} from "../utils/auth-utils.js";
 import {url} from "../../config/config.js";
+import {Validation} from "../utils/validation.js";
+import {ErrorUtils} from "../utils/error-utils.js";
 import flatpickr from "flatpickr";
 import {Russian} from "flatpickr/dist/l10n/ru";
 
@@ -10,7 +11,6 @@ export class EditGeneralOperation {
         this.openNewRouteAutomatic = openNewRouteAutomatic;
         this.urlRequest = urlRequest;
         this.url = url;
-        this.generalElementId = null;
         this.selects = document.querySelectorAll('select');
         this.editTypeElement = this.selects[0];
         this.editCategoryElement = this.selects[1];
@@ -19,103 +19,165 @@ export class EditGeneralOperation {
         this.editCommentElement = document.getElementById('commentEditGeneralElement');
         this.saveBtn = document.getElementById('saveBtn');
         this.cancelBtn = document.getElementById('cancelBtn');
-        this.saveBtn.onclick = this.clickBtnEdit.bind(this);
-        this.cancelBtn.onclick = this.clickBtnCancel.bind(this);
-        this.editElement();
+        this.errorElement = document.getElementById('server-error');
+        this.accessToken = AuthTokens.getToken(AuthTokens.accessTokenKey);
 
-        flatpickr("#dataEditGeneralElement", {
-            dateFormat: "Y-m-d",
-            locale: Russian,
+        if (!this.editTypeElement || !this.editCategoryElement) {
+            this.openNewRouteAutomatic(this.url).catch(error => console.error(error));
+            return;
+        }
+
+        const rawRowData = AuthTokens.getToken('rowData');
+        const generalElementId = AuthTokens.getToken('idRowGenerals');
+        if (!rawRowData || !generalElementId) {
+            this.openNewRouteAutomatic(this.url).catch(error => console.error('Не выбрана операция:', error));
+            return;
+        }
+
+        try {
+            this.rowData = JSON.parse(rawRowData);
+        } catch (error) {
+            this.openNewRouteAutomatic(this.url).catch(routeError => console.error(routeError));
+            return;
+        }
+
+        if (this.saveBtn) this.saveBtn.onclick = this.clickBtnEdit.bind(this);
+        if (this.cancelBtn) this.cancelBtn.onclick = this.clickBtnCancel.bind(this);
+
+        this.editElement().catch(error => {
+            console.error('Ошибка загрузки операции:', error);
+            ErrorUtils.show({networkError: true}, this.errorElement, 'загрузить операцию');
         });
+
+        if (this.editDateElement) {
+            flatpickr(this.editDateElement, {
+                dateFormat: 'Y-m-d',
+                locale: Russian,
+            });
+        }
     }
 
-    editElement() {
-        this.rowData = JSON.parse(AuthTokens.getToken('rowData'));
-        Array.from(this.editTypeElement.options).forEach((item) => {
+    async editElement() {
+        Array.from(this.editTypeElement.options).forEach(option => {
+            option.selected = option.textContent.trim() === this.rowData.type
+                || option.value === this.rowData.type;
+        });
+        this.editTypeElement.disabled = true;
 
-            if(item.textContent === this.rowData.type) {
-                    item.setAttribute('selected', 'selected');
-            } else {
-                item.removeAttribute('selected');
-            }
-            this.editTypeElement.setAttribute('disabled', 'disabled');
-        })
+        if (this.editAmountElement) this.editAmountElement.value = this.rowData.amount ?? '';
+        if (this.editDateElement) this.editDateElement.value = this.rowData.date ?? '';
+        if (this.editCommentElement) this.editCommentElement.value = this.rowData.comment ?? '';
 
-        this.addSelectCategoryValue().then();
-
-        this.editAmountElement.value = this.rowData.amount;
-        this.editDateElement.value = this.rowData.date;
-        this.editCommentElement.value = this.rowData.comment;
-
-        this.selects[0].addEventListener('change', (e) => {
-            this.addSelectCategoryValue().then();
-        })
+        await this.addSelectCategoryValue();
     }
 
     async addSelectCategoryValue() {
-        let urlRequest = null;
         this.accessToken = AuthTokens.getToken(AuthTokens.accessTokenKey);
-        if (this.selects[0].value === 'income') {
-            urlRequest = url.changeIncomes;
-        } else {
-            urlRequest = url.changeExpenses;
+        if (!this.accessToken) {
+            await AuthTokens.handleSessionExpired();
+            return;
         }
-        this.element = await Response.getElementsFromBackend('GET', urlRequest, this.accessToken);
+
+        const urlRequest = this.editTypeElement.value === 'income' ? url.changeIncomes : url.changeExpenses;
+        const result = await Response.getElementsFromBackend('GET', urlRequest, this.accessToken);
+
+        if (!Array.isArray(result)) {
+            console.error('Некорректный ответ категорий:', result);
+            ErrorUtils.show(result, this.errorElement, 'загрузить категории');
+            return;
+        }
+
+        this.element = result;
         this.createSelectOptionsCategory();
     }
 
     createSelectOptionsCategory() {
-        this.selects[1].querySelectorAll('option').forEach(option => {
-            if (option.value !== '') {
-                option.remove();
-            }
-        })
+        Array.from(this.editCategoryElement.options).forEach(option => {
+            if (option.value !== '') option.remove();
+        });
 
-        for (let i = 0; i < this.element.length; i++) {
+        this.element.forEach(item => {
             const option = document.createElement('option');
-            option.value = this.element[i].title;
-            option.id = this.element[i].id;
-            option.innerText = this.element[i].title;
-            this.selects[1].appendChild(option);
+            option.value = item.title;
+            option.id = String(item.id);
+            option.dataset.id = String(item.id);
+            option.textContent = item.title;
+            this.editCategoryElement.appendChild(option);
+        });
+
+        const category = this.rowData.category?.trim() || '';
+        const matchingOption = Array.from(this.editCategoryElement.options)
+            .find(option => option.textContent.trim() === category);
+
+        if (matchingOption) {
+            matchingOption.selected = true;
+            return;
         }
 
-        if(this.rowData.category === 'без категории') {
-            const option = document.createElement('option');
-            option.value = '';
-            option.innerText = 'без категории';
-            option.setAttribute('selected', 'selected');
-            this.selects[1].appendChild(option);
-        } else {
-            Array.from(this.editCategoryElement.options).forEach((item) => {
-                if(item.textContent === this.rowData.category) {
-                    item.setAttribute('selected', 'selected');
-                } else {
-                    item.removeAttribute('selected');
-                }
-            })
+        const noCategoryOption = Array.from(this.editCategoryElement.options)
+            .find(option => option.value === '');
+
+        if (noCategoryOption) {
+            noCategoryOption.selected = true;
+            noCategoryOption.textContent = 'без категории';
+            return;
         }
+
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'без категории';
+        option.selected = true;
+        this.editCategoryElement.insertBefore(option, this.editCategoryElement.firstChild);
     }
 
     async clickBtnEdit() {
-        this.generalElementId = localStorage.getItem('idRowGenerals')
-        if (Validation.validationGenerals(this.selects, this.editAmountElement, this.editDateElement, this.editCommentElement)) {
-            const body = {
-                type: this.selects[0].value,
-                amount: +this.editAmountElement.value,
-                date: this.editDateElement.value,
-                comment: this.editCommentElement.value,
-                category_id: Number(this.selects[1].options[this.selects[1].selectedIndex].id),
-            }
-
-            const result = await Response.getElementsFromBackend('PUT', this.urlRequest + this.generalElementId, this.accessToken, body);
-
-            if(result) {
-                this.openNewRouteAutomatic(this.url);
-            }
+        if (this.errorElement) this.errorElement.innerText = '';
+        const generalElementId = AuthTokens.getToken('idRowGenerals');
+        if (!generalElementId) {
+            await this.openNewRouteAutomatic(this.url);
+            return;
         }
+
+        if (!Validation.validationGenerals(
+            [this.editTypeElement],
+            this.editAmountElement,
+            this.editDateElement,
+            this.editCommentElement,
+            {categoryElement: this.editCategoryElement, categoryRequired: false}
+        )) return;
+
+        this.accessToken = AuthTokens.getToken(AuthTokens.accessTokenKey);
+        if (!this.accessToken) {
+            await AuthTokens.handleSessionExpired();
+            return;
+        }
+
+        const selectedCategory = this.editCategoryElement.options[this.editCategoryElement.selectedIndex];
+        const categoryId = Number(selectedCategory?.id);
+        const body = {
+            type: this.editTypeElement.value,
+            amount: Number(this.editAmountElement.value),
+            date: this.editDateElement.value,
+            comment: this.editCommentElement.value.trim(),
+        };
+
+        if (Number.isInteger(categoryId) && categoryId > 0) body.category_id = categoryId;
+
+        const result = await Response.getElementsFromBackend('PUT', this.urlRequest + generalElementId, this.accessToken, body);
+        if (!result || result.error) {
+            console.error('Ошибка редактирования операции:', result);
+            ErrorUtils.show(result, this.errorElement, 'редактировать операцию');
+            return;
+        }
+
+        AuthTokens.setToken('rowData', null);
+        AuthTokens.setToken('idRowGenerals', null);
+        await this.openNewRouteAutomatic(this.url);
     }
 
-    clickBtnCancel() {
-        this.openNewRouteAutomatic(this.url);
+    async clickBtnCancel() {
+        AuthTokens.setToken('rowData', null);
+        AuthTokens.setToken('idRowGenerals', null);
+        await this.openNewRouteAutomatic(this.url);
     }
 }

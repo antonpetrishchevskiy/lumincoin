@@ -1,45 +1,52 @@
-import {config} from "../../config/config.js";
+import {Response} from "../utils/response-utils.js";
 import {AuthTokens} from "../utils/auth-utils.js";
 
 export class Logout {
-    isBlock = true;
     constructor(openNewRouteAutomatic) {
         this.openNewRouteAutomatic = openNewRouteAutomatic;
-        this.logoutUserName = document.getElementById("layoutUserNameBlock");
-        this.logoutExitBtn = document.getElementById("exit-layout");
-        this.logoutUserName.addEventListener("click", this.showBtnExit.bind(this));
-        this.logoutExitBtn.addEventListener("click", this.logout.bind(this));
-    }
+        this.logoutUserName = document.getElementById('layoutUserNameBlock');
+        this.logoutExitBtn = document.getElementById('exit-layout');
+        this.isBlock = true;
 
-    showBtnExit() {
-        if(this.isBlock) {
-            this.logoutExitBtn.style.display = "block";
-            this.isBlock = false;
-        } else {
-            this.logoutExitBtn.style.display = "none";
-            this.isBlock = true;
+        if (this.logoutUserName) {
+            this.logoutUserName.onclick = this.showBtnExit.bind(this);
+        }
+        if (this.logoutExitBtn) {
+            this.logoutExitBtn.onclick = this.logout.bind(this);
         }
     }
 
+    showBtnExit() {
+        if (!this.logoutExitBtn) return;
+
+        this.isBlock = !this.isBlock;
+        this.logoutExitBtn.style.display = this.isBlock ? 'none' : 'block';
+    }
+
     async logout() {
-        const refreshToken = AuthTokens.getToken(AuthTokens.refreshTokenKey);
+        try {
+            if (AuthTokens.refreshPromise) {
+                await AuthTokens.refreshPromise;
+            }
 
-        const response = await fetch(config.api + '/logout', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-                refreshToken: refreshToken,
-            })
-        });
+            const refreshToken = AuthTokens.getToken(AuthTokens.refreshTokenKey);
+            if (refreshToken) {
+                const result = await Response.getElementsFromBackend(
+                    'POST',
+                    '/logout',
+                    null,
+                    {refreshToken}
+                );
 
-        const result = response.json();
-
-        if(result && !result.error) {
-            localStorage.clear();
-            this.openNewRouteAutomatic('/login');
+                if (result?.error) {
+                    console.error('Ошибка выхода из системы:', result.message);
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка выхода из системы:', error);
+        } finally {
+            AuthTokens.clearAuthTokens();
+            await this.openNewRouteAutomatic('/login');
         }
     }
 }

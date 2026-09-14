@@ -1,90 +1,104 @@
 import flatpickr from "flatpickr";
 import {Russian} from "flatpickr/dist/l10n/ru";
-import {GetDataUtils} from "./getData-utils";
-import {Generals} from "../generals/generals";
+import {GetDataUtils} from "./getData-utils.js";
+import {Generals} from "../generals/generals.js";
 
 export class Period {
     constructor() {
-        this.perionBtns = document.querySelectorAll('.btn-period');
+        this.periodButtons = document.querySelectorAll('.btn-period');
         this.activeButton = null;
         this.today = new Date();
-        this.perionBtns.forEach(button => {
-            button.onclick = this.clickPeriodButton.bind(this);
-        })
         this.dataInputFrom = document.getElementById('dataInputFrom');
         this.dataInputTo = document.getElementById('dataInputTo');
-        this.dataInputFromValue = this.dataInputFrom.value;
-        this.dataInputToValue = this.dataInputTo.value;
+        this.dataInputFromValue = this.dataInputFrom?.value || '';
+        this.dataInputToValue = this.dataInputTo?.value || '';
+
+        this.periodButtons.forEach(button => {
+            button.onclick = this.clickPeriodButton.bind(this);
+        });
     }
 
     clickPeriodButton(event) {
-        this.perionBtns.forEach(button => {
-            if (event.target.textContent === button.textContent) {
-                button.setAttribute('disabled', 'disabled');
-                this.activeButton = button;
-                this.createUrlPeriod();
-            } else {
-                button.removeAttribute('disabled');
-            }
-        })
+        const button = event.currentTarget;
+        this.periodButtons.forEach(item => {
+            const isActive = item === button;
+            item.toggleAttribute('disabled', isActive);
+        });
+
+        this.activeButton = button;
+        this.createUrlPeriod();
     }
 
     createUrlPeriod() {
-        this.dataInputFrom.classList.add('inactive');
-        this.dataInputTo.classList.add('inactive');
+        if (!this.activeButton) {
+            return;
+        }
+
+        this.dataInputFrom?.classList.add('inactive');
+        this.dataInputTo?.classList.add('inactive');
         const today = GetDataUtils.getData(this.today);
+        const buttonText = this.activeButton.innerText.trim();
 
-        if(this.activeButton.innerText === 'Сегодня') {
+        if (buttonText === 'Сегодня') {
             this.period = `?period=${today}`;
-        }
-        else if(this.activeButton.innerText === 'Неделя') {
-            const dayOfWeek = this.today.getDay();
-            let monday = new Date(this.today);
-            monday.setDate(this.today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-            monday = GetDataUtils.getData(monday);
-            this.period = `?period=interval&dateFrom=${monday}&dateTo=${today}`;
-        }
-        else if (this.activeButton.innerText === 'Месяц') {
-            const month =  GetDataUtils.getData(new Date(this.today.setDate('1')));
-            this.period = `?period=interval&dateFrom=${month}&dateTo=${today}`;
-        }
-        else if (this.activeButton.innerText === 'Год') {
-            const year =  GetDataUtils.getData(new Date(this.today.setMonth('0', 1)));
-            this.period = `?period=interval&dateFrom=${year}&dateTo=${today}`;
-        }
-        else if (this.activeButton.innerText === 'Все') {
-            this.period = `?period=all`;
-        }
-        else if (this.activeButton.innerText === 'Интервал') {
-            this.dataInputFrom.classList.remove('inactive');
-            this.dataInputTo.classList.remove('inactive');
-            flatpickr("#dataInputFrom", {
-                dateFormat: "Y-m-d",
-                locale: Russian,
-            });
-            flatpickr("#dataInputTo", {
-                dateFormat: "Y-m-d",
-                locale: Russian,
-            });
-
-            this.dataInputFrom.addEventListener('change', this.changeData.bind(this));
-            this.dataInputTo.addEventListener('change', this.changeData.bind(this));
+        } else if (buttonText === 'Неделя') {
+            const mondayDate = new Date(this.today);
+            const dayOfWeek = mondayDate.getDay();
+            mondayDate.setDate(mondayDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+            this.period = `?period=interval&dateFrom=${GetDataUtils.getData(mondayDate)}&dateTo=${today}`;
+        } else if (buttonText === 'Месяц') {
+            const monthStart = new Date(this.today.getFullYear(), this.today.getMonth(), 1);
+            this.period = `?period=interval&dateFrom=${GetDataUtils.getData(monthStart)}&dateTo=${today}`;
+        } else if (buttonText === 'Год') {
+            const yearStart = new Date(this.today.getFullYear(), 0, 1);
+            this.period = `?period=interval&dateFrom=${GetDataUtils.getData(yearStart)}&dateTo=${today}`;
+        } else if (buttonText === 'Все') {
+            this.period = '?period=all';
+        } else if (buttonText === 'Интервал') {
+            this.enableCustomRange();
+            return;
         }
 
-        if(this.activeButton.innerText !== 'Интервал') {
-            new Generals(this.period);
+        new Generals(this.period);
+    }
+
+    enableCustomRange() {
+        if (!this.dataInputFrom || !this.dataInputTo) {
+            return;
         }
+
+        this.dataInputFrom.classList.remove('inactive');
+        this.dataInputTo.classList.remove('inactive');
+
+        if (this.dataInputFrom._flatpickr) {
+            this.dataInputFrom._flatpickr.destroy();
+        }
+        if (this.dataInputTo._flatpickr) {
+            this.dataInputTo._flatpickr.destroy();
+        }
+
+        flatpickr(this.dataInputFrom, {
+            dateFormat: 'Y-m-d',
+            locale: Russian,
+        });
+        flatpickr(this.dataInputTo, {
+            dateFormat: 'Y-m-d',
+            locale: Russian,
+        });
+
+        this.dataInputFrom.onchange = this.changeData.bind(this);
+        this.dataInputTo.onchange = this.changeData.bind(this);
     }
 
     changeData(event) {
-        if (event.target.id === 'dataInputFrom') {
+        if (event.target === this.dataInputFrom) {
             this.dataInputFromValue = event.target.value;
-        } else {
+        } else if (event.target === this.dataInputTo) {
             this.dataInputToValue = event.target.value;
         }
 
-        if(this.dataInputFromValue !== '' && this.dataInputToValue !== '') {
-            this.period  = `?period=interval&dateFrom=${this.dataInputFromValue}&dateTo=${this.dataInputToValue}`;
+        if (this.dataInputFromValue && this.dataInputToValue) {
+            this.period = `?period=interval&dateFrom=${this.dataInputFromValue}&dateTo=${this.dataInputToValue}`;
             new Generals(this.period);
         }
     }

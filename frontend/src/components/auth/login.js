@@ -1,38 +1,42 @@
 import {Validation} from "../utils/validation.js";
 import {AuthTokens} from "../utils/auth-utils.js";
 import {FormUtils} from "../utils/reset-validation.js";
-
+import {ErrorUtils} from "../utils/error-utils.js";
 
 export class Login {
     constructor(openNewRouteAutomatic) {
         this.openNewRouteAutomatic = openNewRouteAutomatic;
-        this.inputsElement = document.querySelectorAll('.form-floating  input');
+        this.inputsElement = document.querySelectorAll('.form-floating input');
         this.rememberMeInput = document.getElementById('remember-meInput');
         this.errorLogin = document.getElementById('error-login');
-        document.getElementById("loginBtn").addEventListener("click", this.login.bind(this));
+
+        const loginButton = document.getElementById('loginBtn');
+        if (loginButton) {
+            loginButton.onclick = this.login.bind(this);
+        }
     }
 
     async login() {
-        // Очищаем значения и стили полей с помощью утилиты
         FormUtils.resetValidationErrors(this.inputsElement, this.errorLogin);
 
-        if (Validation.validForm(this.inputsElement)) {
-            const date = Validation.validForm(this.inputsElement);
-
-            const result = await AuthTokens.getTokensAfterRegistration(date.emailInputElement, date.passwordInputElement, this.rememberMeInput.checked);
-            if (result) {
-                if (result.error || !result.tokens || !result.user) {
-                    this.errorLogin.innerText = 'Такого пользователя не существует';
-                    return;
-                } else {
-                    this.errorLogin.innerText = '';
-                }
-
-                this.openNewRouteAutomatic('/');
-                return
-
-            }
+        const formData = Validation.validForm(this.inputsElement);
+        if (!formData) {
             this.errorLogin.innerText = 'Пожалуйста, заполните все поля корректно';
+            return;
         }
+
+        const result = await AuthTokens.getTokensAfterRegistration(
+            formData.emailInputElement,
+            formData.passwordInputElement,
+            Boolean(this.rememberMeInput?.checked)
+        );
+
+        if (!result || result.error) {
+            ErrorUtils.show(result, this.errorLogin);
+            return;
+        }
+
+        this.errorLogin.innerText = '';
+        await this.openNewRouteAutomatic('/');
     }
 }

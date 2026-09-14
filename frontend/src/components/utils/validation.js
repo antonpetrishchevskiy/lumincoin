@@ -1,136 +1,147 @@
 export class Validation {
-
     static validForm(inputsElement, password = '') {
         let isValid = true;
-        let date = {
+        const data = {
             nameInputElement: null,
-            lastNameInputElement: null, // Добавлено поле для фамилии
+            lastNameInputElement: null,
             emailInputElement: null,
             passwordInputElement: null,
             passwordReplaceInputElement: null,
             rememberMeInputElement: null,
-        }
-        inputsElement.forEach((inputElement) => {
-            const parentInputElement = inputElement.closest('.input-block');
-            const iconInputElement = inputElement.closest('.form-floating').previousElementSibling;
-            isValid = true;
+        };
 
-            if (inputElement.value !== '') {
-                if (inputElement.id === 'signUpInputName') { // Валидация имени
-                    if (inputElement.value.match(/^[А-ЯЁ][а-яё]+$/)) {
-                        date.nameInputElement = inputElement.value;
-                        inputElement.classList.remove('invalid');
-                        iconInputElement.classList.remove('invalid');
-                        parentInputElement.nextElementSibling.classList.remove('invalid');
-                    } else {
-                        inputElement.classList.add('invalid');
-                        iconInputElement.classList.add('invalid');
-                        parentInputElement.nextElementSibling.classList.add('invalid');
-                        isValid = false;
-                    }
+        let primaryPassword = password;
+
+        inputsElement.forEach(inputElement => {
+            const parentInputElement = inputElement.closest('.input-block');
+            const iconInputElement = inputElement.closest('.form-floating')?.previousElementSibling;
+            const errorElement = parentInputElement?.nextElementSibling;
+            const invalidate = () => {
+                inputElement.classList.add('invalid');
+                iconInputElement?.classList.add('invalid');
+                errorElement?.classList.add('invalid');
+                isValid = false;
+            };
+            const validateSuccess = () => {
+                inputElement.classList.remove('invalid');
+                iconInputElement?.classList.remove('invalid');
+                errorElement?.classList.remove('invalid');
+            };
+
+            const value = inputElement.type === 'password'
+                ? inputElement.value
+                : inputElement.value.trim();
+            if (!value) {
+                invalidate();
+                return;
+            }
+
+            if (inputElement.id === 'signUpInputName') {
+                if (/^.{3,}$/u.test(value)) {
+                    data.nameInputElement = value;
+                    validateSuccess();
+                } else {
+                    invalidate();
                 }
-                else if (inputElement.id === 'signUpInputLastName') { // Валидация фамилии
-                    if (inputElement.value.match(/^[А-ЯЁ][а-яё]+$/)) {
-                        date.lastNameInputElement = inputElement.value;
-                        inputElement.classList.remove('invalid');
-                        iconInputElement.classList.remove('invalid');
-                        parentInputElement.nextElementSibling.classList.remove('invalid');
-                    } else {
-                        inputElement.classList.add('invalid');
-                        iconInputElement.classList.add('invalid');
-                        parentInputElement.nextElementSibling.classList.add('invalid');
-                        isValid = false;
-                    }
+            } else if (inputElement.id === 'signUpInputLastName') {
+                if (/^.{3,}$/u.test(value)) {
+                    data.lastNameInputElement = value;
+                    validateSuccess();
+                } else {
+                    invalidate();
                 }
-                else if (inputElement.type === 'email') {
-                    if (inputElement.value && inputElement.value.match(/^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]{2,}$/)) {
-                        date.emailInputElement = inputElement.value;
-                        inputElement.classList.remove('invalid');
-                        iconInputElement.classList.remove('invalid');
-                        parentInputElement.nextElementSibling.classList.remove('invalid');
-                    } else {
-                        inputElement.classList.add('invalid');
-                        iconInputElement.classList.add('invalid');
-                        parentInputElement.nextElementSibling.classList.add('invalid');
-                        isValid = false;
-                    }
+            } else if (inputElement.type === 'email') {
+                if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/u.test(value)) {
+                    data.emailInputElement = value;
+                    validateSuccess();
+                } else {
+                    invalidate();
                 }
-                else if (inputElement.type === 'password') {
-                    if (inputElement.value.match(/^(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/) && password === '') {
-                        date.passwordInputElement = inputElement.value;
-                        inputElement.classList.remove('invalid');
-                        iconInputElement.classList.remove('invalid');
-                        parentInputElement.nextElementSibling.classList.remove('invalid');
-                        password = inputElement.value;
-                    } else if (password !== '' && inputElement.value === password) {
-                        date.passwordReplaceInputElement = inputElement.value;
-                        inputElement.classList.remove('invalid');
-                        iconInputElement.classList.remove('invalid');
-                        parentInputElement.nextElementSibling.classList.remove('invalid');
+            } else if (inputElement.type === 'password') {
+                if (inputElement.id === 'signUpInputRepeatPassword') {
+                    if (primaryPassword && value === primaryPassword) {
+                        data.passwordReplaceInputElement = value;
+                        validateSuccess();
                     } else {
-                        inputElement.classList.add('invalid');
-                        iconInputElement.classList.add('invalid');
-                        parentInputElement.nextElementSibling.classList.add('invalid');
-                        isValid = false;
+                        invalidate();
                     }
+                } else if (value.length >= 6) {
+                    data.passwordInputElement = value;
+                    primaryPassword = value;
+                    validateSuccess();
+                } else {
+                    invalidate();
                 }
             } else {
-                inputElement.classList.add('invalid');
-                iconInputElement.classList.add('invalid');
-                parentInputElement.nextElementSibling.classList.add('invalid');
-                isValid = false;
+                validateSuccess();
             }
-        })
+        });
 
-        if (isValid) {
-            return date;
-        }
-        return false;
+        return isValid ? data : false;
     }
 
-    static validationGenerals(selects, amount, data, comment) {
-        this.selects = selects;
-        this.amountElement = amount;
-        this.dataElement = data;
-        this.commentElement = comment;
+    static validationGenerals(selects, amount, data, comment, options = {}) {
+        let isValid = true;
+        const categoryElement = options.categoryElement || selects[1];
+        const categoryRequired = options.categoryRequired !== false;
 
-        let isError = true;
-
-        this.selects.forEach(select => {
-            if (select.value === '') {
-                select.nextElementSibling.style.display = 'block';
+        selects.forEach(select => {
+            if (!select.value) {
+                select.nextElementSibling?.style.setProperty('display', 'block');
                 select.classList.add('invalid');
-                isError = false;
+                isValid = false;
             } else {
-                select.nextElementSibling.style.display = 'none';
+                select.nextElementSibling?.style.setProperty('display', 'none');
                 select.classList.remove('invalid');
             }
-        })
+        });
 
-        if (this.amountElement.value === '') {
-            this.amountElement.nextElementSibling.style.display = 'block';
-            this.amountElement.classList.add('invalid');
-            isError = false;
-        } else {
-            this.amountElement.nextElementSibling.style.display = 'none';
-            this.amountElement.classList.remove('invalid');
+        if (categoryElement && !categoryRequired) {
+            categoryElement.nextElementSibling?.style.setProperty('display', 'none');
+            categoryElement.classList.remove('invalid');
         }
-        if (this.dataElement.value === '' || !/^\d{4}-\d{2}-\d{2}$/.test(this.dataElement.value)) {
-            this.dataElement.nextElementSibling.style.display = 'block';
-            this.dataElement.classList.add('invalid');
-            isError = false;
+
+        const amountValue = Number(amount?.value);
+        if (!Number.isFinite(amountValue) || amountValue <= 0) {
+            amount?.nextElementSibling?.style.setProperty('display', 'block');
+            amount?.classList.add('invalid');
+            isValid = false;
         } else {
-            this.dataElement.nextElementSibling.style.display = 'none';
-            this.dataElement.classList.remove('invalid');
+            amount?.nextElementSibling?.style.setProperty('display', 'none');
+            amount?.classList.remove('invalid');
         }
-        if (this.commentElement.value === '') {
-            this.commentElement.nextElementSibling.style.display = 'block';
-            this.commentElement.classList.add('invalid');
-            isError = false;
+
+        const dateValue = data?.value || '';
+        const dateParts = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        let validDate = false;
+        if (dateParts) {
+            const year = Number(dateParts[1]);
+            const month = Number(dateParts[2]);
+            const day = Number(dateParts[3]);
+            const date = new Date(Date.UTC(year, month - 1, day));
+            validDate = date.getUTCFullYear() === year
+                && date.getUTCMonth() === month - 1
+                && date.getUTCDate() === day;
+        }
+
+        if (!validDate) {
+            data?.nextElementSibling?.style.setProperty('display', 'block');
+            data?.classList.add('invalid');
+            isValid = false;
         } else {
-            this.commentElement.nextElementSibling.style.display = 'none';
-            this.commentElement.classList.remove('invalid');
+            data?.nextElementSibling?.style.setProperty('display', 'none');
+            data?.classList.remove('invalid');
         }
-        return isError;
+
+        if (!comment?.value.trim()) {
+            comment?.nextElementSibling?.style.setProperty('display', 'block');
+            comment?.classList.add('invalid');
+            isValid = false;
+        } else {
+            comment?.nextElementSibling?.style.setProperty('display', 'none');
+            comment?.classList.remove('invalid');
+        }
+
+        return isValid;
     }
 }

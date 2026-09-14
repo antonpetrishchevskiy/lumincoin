@@ -1,36 +1,53 @@
 import {AuthTokens} from "../utils/auth-utils.js";
 import {Response} from "../utils/response-utils.js";
+import {ErrorUtils} from "../utils/error-utils.js";
 
 export class DeleteGeneralElement {
     constructor(openNewRouteAutomatic, urlRequest, url) {
         this.openNewRouteAutomatic = openNewRouteAutomatic;
         this.urlRequest = urlRequest;
         this.url = url;
-        this.generalElementId = null;
         this.deleteBtn = document.getElementById('deleteBtn');
         this.cancelBtn = document.getElementById('cancelBtn');
-        this.deleteBtn.onclick = this.deleteElement.bind(this);
-        this.cancelBtn.onclick = this.cancelDelete.bind(this);
+        this.errorElement = document.getElementById('server-error');
+
+        if (this.deleteBtn) this.deleteBtn.onclick = this.deleteElement.bind(this);
+        if (this.cancelBtn) this.cancelBtn.onclick = this.cancelDelete.bind(this);
     }
 
     async deleteElement() {
-        this.generalElementId = localStorage.getItem('idRowGenerals');
+        if (this.errorElement) this.errorElement.innerText = '';
+
+        const generalElementId = localStorage.getItem('idRowGenerals');
+        if (!generalElementId) {
+            await this.openNewRouteAutomatic(this.url);
+            return;
+        }
+
         const accessToken = AuthTokens.getToken(AuthTokens.accessTokenKey);
         if (!accessToken) {
-            console.log('No access token');
+            await AuthTokens.handleSessionExpired();
             return;
         }
 
-        const result = await Response.getElementsFromBackend('DELETE', this.urlRequest + this.generalElementId, accessToken);
+        const result = await Response.getElementsFromBackend(
+            'DELETE',
+            this.urlRequest + generalElementId,
+            accessToken
+        );
 
-        if (result.error) {
-            console.log(`Error: ${result.message}`)
+        if (!result || result.error) {
+            console.error('Ошибка удаления операции:', result);
+            ErrorUtils.show(result, this.errorElement, 'удалить операцию');
             return;
         }
-        this.openNewRouteAutomatic(this.url);
+
+        localStorage.removeItem('idRowGenerals');
+        localStorage.removeItem('rowData');
+        await this.openNewRouteAutomatic(this.url);
     }
 
-    cancelDelete() {
-        this.openNewRouteAutomatic(this.url);
+    async cancelDelete() {
+        await this.openNewRouteAutomatic(this.url);
     }
 }

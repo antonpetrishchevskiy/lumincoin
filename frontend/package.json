@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack",
-    "dev": "webpack serve --open"
+    "dev": "webpack serve --open",
+    "check:syntax": "node scripts/check-syntax.js"
   },
   "keywords": [],
   "author": "",

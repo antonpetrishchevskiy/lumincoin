@@ -2,6 +2,7 @@ import {Response} from "../utils/response-utils.js";
 import {AuthTokens} from "../utils/auth-utils.js";
 import {url} from "../../config/config.js";
 import {Validation} from "../utils/validation.js";
+import {ErrorUtils} from "../utils/error-utils.js";
 import flatpickr from "flatpickr";
 import {Russian} from "flatpickr/dist/l10n/ru";
 
@@ -13,98 +14,127 @@ export class CreateGeneralOperation {
         this.amountElement = document.getElementById('sumCreateGeneralElement');
         this.dataElement = document.getElementById('dataCreateGeneralElement');
         this.commentElement = document.getElementById('commentCreateGeneralElement');
-        this.btnCreate = document.getElementById("btn-create");
-        this.btnCancel = document.getElementById("btn-cancel");
-        this.accessToken = AuthTokens.getToken(AuthTokens.accessTokenKey);
-        this.type = AuthTokens.getToken('createBtn');
+        this.btnCreate = document.getElementById('btn-create');
+        this.btnCancel = document.getElementById('btn-cancel');
+        this.errorElement = document.getElementById('server-error');
         this.selects = document.querySelectorAll('select');
-        this.selectColorText();
-        this.automaticChoiceType();
-        this.btnCancel.onclick = this.clickBtnCancel.bind(this);
-        this.btnCreate.onclick = this.clickBtnCreate.bind(this);
+        this.type = AuthTokens.getToken('createBtn');
+        this.accessToken = AuthTokens.getToken(AuthTokens.accessTokenKey);
 
-        flatpickr("#dataCreateGeneralElement", {
-            dateFormat: "Y-m-d",
-            locale: Russian,
+        this.selectColorText();
+        this.automaticChoiceType().catch(error => {
+            console.error('Ошибка загрузки категорий:', error);
+            ErrorUtils.show({networkError: true}, this.errorElement, 'загрузить категории');
         });
+        if (this.btnCancel) this.btnCancel.onclick = this.clickBtnCancel.bind(this);
+        if (this.btnCreate) this.btnCreate.onclick = this.clickBtnCreate.bind(this);
+
+        const dateInput = document.getElementById('dataCreateGeneralElement');
+        if (dateInput) {
+            flatpickr(dateInput, {
+                dateFormat: 'Y-m-d',
+                locale: Russian,
+            });
+        }
     }
 
     selectColorText() {
+        if (this.selects.length < 2) return;
+
         this.selects[1].style.color = '#6c757d';
-        this.selects[0].addEventListener('focus', (e) => {
+        this.selects[0].onfocus = () => {
             this.selects[0].style.color = 'black';
-        })
-        this.selects[1].addEventListener('focus', (e) => {
+        };
+        this.selects[1].onfocus = () => {
             this.selects[1].style.color = 'black';
-        })
-        this.selects[1].addEventListener('blur', (e) => {
-            if (this.selects[1].value === '') {
-                this.selects[1].style.color = '#6c757d';
-            }
-        })
+        };
+        this.selects[1].onblur = () => {
+            if (this.selects[1].value === '') this.selects[1].style.color = '#6c757d';
+        };
     }
 
-    automaticChoiceType() {
-        this.selects[0].querySelectorAll('option').forEach(option => {
-            if (option.value === this.type) {
-                option.selected = true;
-            }
-            this.selects[0].setAttribute('disabled', 'disabled');
+    async automaticChoiceType() {
+        if (this.selects.length < 2) return;
+
+        Array.from(this.selects[0].options).forEach(option => {
+            option.selected = option.value === this.type;
         });
-        this.addSelectCategoryValue().then();
+        this.selects[0].disabled = true;
+        await this.addSelectCategoryValue();
     }
 
     async addSelectCategoryValue() {
-        let urlRequest = null;
+        if (this.selects.length < 2) return;
+
         this.accessToken = AuthTokens.getToken(AuthTokens.accessTokenKey);
-        if (this.selects[0].value === 'income') {
-            console.log('доход')
-            urlRequest = url.changeIncomes;
-        } else {
-            urlRequest = url.changeExpenses;
-            console.log('расход')
+        if (!this.accessToken) {
+            await AuthTokens.handleSessionExpired();
+            return;
         }
-        this.element = await Response.getElementsFromBackend('GET', urlRequest, this.accessToken);
+
+        const urlRequest = this.selects[0].value === 'income' ? url.changeIncomes : url.changeExpenses;
+        const result = await Response.getElementsFromBackend('GET', urlRequest, this.accessToken);
+
+        if (!Array.isArray(result)) {
+            console.error('Некорректный ответ категорий:', result);
+            ErrorUtils.show(result, this.errorElement, 'загрузить категории');
+            return;
+        }
+
+        this.element = result;
         this.createSelectOptionsCategory();
     }
 
     createSelectOptionsCategory() {
-        this.selects[1].querySelectorAll('option').forEach(option => {
-            if (option.value !== '') {
-                option.remove();
-            }
-        })
+        if (!this.selects[1] || !Array.isArray(this.element)) return;
 
-        console.log(this.element)
+        Array.from(this.selects[1].options).forEach(option => {
+            if (option.value !== '') option.remove();
+        });
 
-        for (let i = 0; i < this.element.length; i++) {
+        this.element.forEach(item => {
             const option = document.createElement('option');
-            option.value = this.element[i].title;
-            option.id = this.element[i].id;
-            option.innerText = this.element[i].title;
+            option.value = item.title;
+            option.dataset.id = String(item.id);
+            option.id = String(item.id);
+            option.textContent = item.title;
             this.selects[1].appendChild(option);
-        }
+        });
     }
 
     async clickBtnCreate() {
-        if (Validation.validationGenerals(this.selects, this.amountElement, this.dataElement, this.commentElement)) {
+        if (this.errorElement) this.errorElement.innerText = '';
+        if (!Validation.validationGenerals(this.selects, this.amountElement, this.dataElement, this.commentElement)) return;
 
-            const body = {
-                type: this.selects[0].value,
-                amount: this.amountElement.value,
-                date: this.dataElement.value,
-                comment: this.commentElement.value,
-                category_id: Number(this.selects[1].options[this.selects[1].selectedIndex].id),
-            }
+        const selectedCategory = this.selects[1]?.options[this.selects[1].selectedIndex];
+        const categoryId = Number(selectedCategory?.id);
+        if (!Number.isInteger(categoryId) || categoryId <= 0) return;
 
-            const result = await Response.getElementsFromBackend('POST', this.urlRequest, this.accessToken, body);
-            if (result) {
-                this.openNewRouteAutomatic(this.url);
-            }
+        this.accessToken = AuthTokens.getToken(AuthTokens.accessTokenKey);
+        if (!this.accessToken) {
+            await AuthTokens.handleSessionExpired();
+            return;
         }
+
+        const body = {
+            type: this.selects[0].value,
+            amount: Number(this.amountElement.value),
+            date: this.dataElement.value,
+            comment: this.commentElement.value.trim(),
+            category_id: categoryId,
+        };
+
+        const result = await Response.getElementsFromBackend('POST', this.urlRequest, this.accessToken, body);
+        if (!result || result.error) {
+            console.error('Ошибка создания операции:', result);
+            ErrorUtils.show(result, this.errorElement, 'создать операцию');
+            return;
+        }
+
+        await this.openNewRouteAutomatic(this.url);
     }
 
-    clickBtnCancel() {
-        this.openNewRouteAutomatic(this.url);
+    async clickBtnCancel() {
+        await this.openNewRouteAutomatic(this.url);
     }
 }

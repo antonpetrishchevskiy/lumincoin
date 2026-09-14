@@ -3,123 +3,99 @@ import Chart from 'chart.js/auto';
 
 export class Main {
     constructor() {
-        // this.canvas1 = null;
-        // this.chartExpenses = null;
-        // this.chartIncomes = null;
         new Period();
     }
 
+    static getCategoryColor(category, palette) {
+        const normalizedCategory = String(category ?? 'без категории');
+        let hash = 0;
+
+        for (let index = 0; index < normalizedCategory.length; index += 1) {
+            hash = (hash * 31 + normalizedCategory.charCodeAt(index)) >>> 0;
+        }
+
+        return palette[hash % palette.length];
+    }
+
     static paintDiagramms(result) {
-        this.result = result;
+        if (!Array.isArray(result)) {
+            return;
+        }
+
         this.canvas1 = document.getElementById('myChart');
         this.canvas2 = document.getElementById('myChart2');
 
-        if (this.chartExpenses) {
-            this.chartExpenses.destroy();
+        if (!this.canvas1 || !this.canvas2) {
+            return;
         }
 
-        if (this.chartIncomes) {
-            this.chartIncomes.destroy();
-        }
+        this.chartExpenses?.destroy();
+        this.chartIncomes?.destroy();
 
-        this.mapIncomes = new Map();
-        this.mapExpenses = new Map();
-        this.categoryIncomes = [];
-        this.amountIncomes = [];
-        this.categoryExpenses = [];
-        this.amounExpenses = [];
+        const incomeMap = new Map();
+        const expenseMap = new Map();
 
-        this.result.forEach(item => {
-            if (item.type === 'income') {
-                let i = 0;
-                if(!this.categoryIncomes.includes(item.category) && item.category !== undefined) {
-                    this.categoryIncomes.push(item.category);
-                    this.mapIncomes.set(item.category, item.amount);
-                }  else if(!this.categoryIncomes.includes('без категории') && item.category === undefined) {
-                    this.categoryIncomes.push('без категории');
-                    this.mapIncomes.set('без категории', item.amount);
-                } else if (this.categoryIncomes.includes('без категории') && item.category === undefined) {
-                    this.mapIncomes.set('без категории', +this.mapIncomes.get('без категории') + item.amount);
-                } else {
-                    this.mapIncomes.set(item.category, +this.mapIncomes.get(item.category) + item.amount);
-                }
-            } else if (item.type === 'expense') {
-                let i = 0;
-                if(!this.categoryExpenses.includes(item.category) && item.category !== undefined) {
-                    this.categoryExpenses.push(item.category);
-                    this.mapExpenses.set(item.category, item.amount);
-                }  else if(!this.categoryExpenses.includes('без категории') && item.category === undefined) {
-                    this.categoryExpenses.push('без категории');
-                    this.mapExpenses.set('без категории', item.amount);
-                } else if (this.categoryExpenses.includes('без категории') && item.category === undefined) {
-                    this.mapExpenses.set('без категории', +this.mapExpenses.get('без категории') + item.amount);
-                } else {
-                    this.mapExpenses.set(item.category, +this.mapExpenses.get(item.category) + item.amount);
-                }
+        result.forEach(item => {
+            if (item?.type !== 'income' && item?.type !== 'expense') {
+                return;
             }
-        })
 
-        this.categoryIncomes.forEach(item => {
-            this.amountIncomes.push(this.mapIncomes.get(item));
-        })
+            const category = item.category ?? 'без категории';
+            const amount = Number(item.amount);
+            if (!Number.isFinite(amount)) {
+                return;
+            }
 
-        this.categoryExpenses.forEach(item => {
-            this.amounExpenses.push(this.mapExpenses.get(item));
-        })
+            const targetMap = item.type === 'income' ? incomeMap : expenseMap;
+            targetMap.set(category, (targetMap.get(category) || 0) + amount);
+        });
 
+        const categoryIncomes = [...incomeMap.keys()];
+        const amountIncomes = [...incomeMap.values()];
+        const categoryExpenses = [...expenseMap.keys()];
+        const amountExpenses = [...expenseMap.values()];
+
+        const incomePalette = [
+            '#198754',
+            '#20c997',
+            '#0d6efd',
+            '#6f42c1',
+            '#0dcaf0',
+        ];
+        const expensePalette = [
+            '#dc3545',
+            '#fd7e14',
+            '#ffc107',
+            '#d63384',
+            '#bb2d3b',
+        ];
+
+        const incomeColors = categoryIncomes.map(category =>
+            this.getCategoryColor(category, incomePalette)
+        );
+        const expenseColors = categoryExpenses.map(category =>
+            this.getCategoryColor(category, expensePalette)
+        );
 
         this.chartIncomes = new Chart(this.canvas1, {
             type: 'pie',
             data: {
-                labels: this.categoryIncomes,
+                labels: categoryIncomes,
                 datasets: [{
-                    data: this.amountIncomes,
-                    backgroundColor: [
-                        'rgb(218,53,68)',
-                        'rgb(251,125,20)',
-                        'rgb(253,191,7)',
-                        'rgb(32,199,150)',
-                        'rgb(13,109,251)',
-                        'rgb(113,9,151)',
-                        'rgb(18,213,218)',
-                        'rgb(201,205,100)',
-                        'rgb(253,1,127)',
-                        'rgb(132,9,250)',
-                        'rgb(13,29,251)',
-                        'rgb(118,13,18)',
-                        'rgb(151,25,20)',
-                        'rgb(193,91,17)',
-                        'rgb(102,99,50)',
-                    ]
-                }]
+                    data: amountIncomes,
+                    backgroundColor: incomeColors,
+                }],
             },
         });
-
 
         this.chartExpenses = new Chart(this.canvas2, {
             type: 'pie',
             data: {
-                labels: this.categoryExpenses,
+                labels: categoryExpenses,
                 datasets: [{
-                    data: this.amounExpenses,
-                    backgroundColor: [
-                        'rgb(218,53,68)',
-                        'rgb(251,125,20)',
-                        'rgb(253,191,7)',
-                        'rgb(32,199,150)',
-                        'rgb(13,109,251)',
-                        'rgb(113,9,151)',
-                        'rgb(18,213,218)',
-                        'rgb(201,205,100)',
-                        'rgb(253,1,127)',
-                        'rgb(132,9,250)',
-                        'rgb(13,29,251)',
-                        'rgb(118,13,18)',
-                        'rgb(151,25,20)',
-                        'rgb(193,91,17)',
-                        'rgb(102,99,50)',
-                    ]
-                }]
+                    data: amountExpenses,
+                    backgroundColor: expenseColors,
+                }],
             },
         });
     }

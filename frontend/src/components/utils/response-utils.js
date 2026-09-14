@@ -1,60 +1,98 @@
-import {AuthTokens} from "./auth-utils";
+import {AuthTokens} from "./auth-utils.js";
 import {config} from "../../config/config.js";
 
 export class Response {
-    static async getElementsFromBackend(method, url, accessToken, body, params) {
-        let headers = {};
+    static async getElementsFromBackend(method, url, accessToken, body, params, isRetry = false) {
+        const headers = {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+        };
 
         if (accessToken) {
-            headers = {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'x-auth-token': accessToken,
+            headers['x-auth-token'] = accessToken;
+        }
+
+        const requestUrl = new URL(config.api + url, window.location.origin);
+        if (params && typeof params === 'object') {
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    requestUrl.searchParams.set(key, String(value));
+                }
+            });
+        }
+
+        const request = {
+            method,
+            headers,
+        };
+
+        if (body !== undefined && body !== null && !['GET', 'HEAD'].includes(method.toUpperCase())) {
+            request.body = JSON.stringify(body);
+        }
+
+        const requestPath = url.split('?')[0].replace(/\/+$/, '') || '/';
+        const isAuthRequest = ['/login', '/refresh', '/logout', '/signup'].includes(requestPath);
+
+        try {
+            const response = await fetch(requestUrl, request);
+            const responseText = await response.text();
+            let result = {};
+
+            if (responseText) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (error) {
+                    console.error(`Некорректный JSON в ответе ${method} ${url}:`, error);
+                    result = {
+                        error: true,
+                        status: response.status,
+                        message: `Некорректный ответ сервера (HTTP ${response.status})`,
+                    };
+                }
             }
-        } else {
-            headers = {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
+
+            const tokenExpired = response.status === 401 || result?.message === 'jwt expired';
+
+            if (tokenExpired && !isAuthRequest && !isRetry) {
+                const newAccessToken = await AuthTokens.refreshToken();
+
+                if (newAccessToken) {
+                    return this.getElementsFromBackend(method, url, newAccessToken, body, params, true);
+                }
+
+                if (!AuthTokens.getToken(AuthTokens.refreshTokenKey)) {
+                    await AuthTokens.handleSessionExpired();
+                }
             }
-        }
 
-        let object = {
-            method: method,
-            headers: headers,
-        }
-
-        if (body) {
-            object.body = JSON.stringify(body);
-        }
-
-        if (params) {
-            object.params = JSON.stringify(params);
-        }
-
-        const response = await fetch(config.api + url, object);
-
-        if (!response.status >= 200 && !response.status < 300) {
-            console.log('Error fetching incomes from backend');
-            return;
-        }
-
-        const result = await response.json();
-
-        if (result.error) {
-            if (result.message === "jwt expired") {
-                await AuthTokens.refreshToken();
-                await this.getElementsFromBackend(method, url, accessToken, body);
-                return;
-            } else if (result.message === "Invalid email or password") {
-                return result;
-            } else if (result.message) {
-                localStorage.clear();
-                return result;
-            } else {
-                console.log(`Error: ${result.message}`);
-                localStorage.clear();
+            if (tokenExpired && !isAuthRequest && isRetry) {
+                await AuthTokens.handleSessionExpired();
             }
+
+            if (result?.error) {
+                return {
+                    ...result,
+                    error: true,
+                    status: response.status,
+                };
+            }
+
+            if (!response.ok) {
+                return {
+                    error: true,
+                    status: response.status,
+                    message: result?.message || `HTTP ${response.status}`,
+                };
+            }
+
+            return result;
+        } catch (error) {
+            console.error(`Ошибка запроса ${method} ${url}:`, error);
+            return {
+                error: true,
+                networkError: true,
+                message: 'Ошибка соединения с сервером',
+            };
         }
-        return result;
     }
 }
